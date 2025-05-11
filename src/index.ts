@@ -1,5 +1,6 @@
 import { Context, Session, Logger, Time, Schema } from 'koishi'
 import RssFeedEmitter from 'rss-feed-emitter'
+import axios from 'axios'
 
 declare module 'koishi' {
   interface Channel {
@@ -27,6 +28,17 @@ export const Config: Schema<Config> = Schema.object({
   refresh: Schema.number().description('刷新数据的时间间隔。').default(Time.minute),
   userAgent: Schema.string().description('请求时使用的 User Agent。'),
 })
+
+const extractAdditions = (patch) => {
+    // 将 patch 分割成单独的行
+    const lines = patch.split('\n');
+    
+    // 过滤出以 '+' 开头但不是 '+++' 的行，因为 '+++' 是文件头部信息的一部分
+    const additions = lines.filter(line => line.startsWith('+') && !line.startsWith('+++'))
+                           .map(line => line.slice(1)); // 去除 '+' 前缀
+    
+    return additions;
+};
 
 export function apply(ctx: Context, config: Config) {
   ctx.model.extend('channel', {
@@ -65,11 +77,51 @@ export function apply(ctx: Context, config: Config) {
   })
 
   feeder.on('new-item', async (payload) => {
-    logger.debug('receive', payload.title)
+    console.debug('receive')
     const source = payload.meta.link
-    if (!feedMap[source]) return
-    const message = `${payload.meta.title} (${payload.author})\n${payload.title}`
-    await ctx.broadcast([...feedMap[source]], message)
+    // if (!feedMap[source]) return
+    // const message = `${payload.meta.title} (${payload.author})\n${payload.title}`
+    
+    const itemLink = payload.link; // 这里获取的是单个条目的链接
+    // 解析出 commit ID 和仓库路径
+    const commitId = itemLink.split('/').pop();
+    const repoPath = itemLink.match(/github\.com\/([^\/]+\/[^\/]+)/)[1];
+    // 构建 API URL 和 headers
+    const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${commitId}`;
+    console.debug(apiUrl);
+    const headers = {
+    'Authorization': 'token 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', // 替换成你的 GitHub token
+    'Accept': 'application/vnd.github.v3+json'
+  };
+
+    try {
+        var response = await axios.get(apiUrl, { headers });
+        // console.log(commitDetails); // 此处处理获取到的提交详情数据
+    } catch (error) {
+        console.error("Error fetching commit details:", error);
+    }
+    let message = '你有新的大学夏令营信息！（机器人信息~）\n';
+    response.data.files.forEach(file => {
+      if (file.patch) { // 确保有 patch 数据
+      const additions = extractAdditions(file.patch);
+      additions.forEach(addition => {
+        message += addition + '\n';
+      });
+      }
+    });
+
+  //   let message;
+  //   commitDetails.files.forEach(file => {
+  //   if (file.patch) { // 确保有 patch 数据
+  //       const additions = extractAdditions(file.patch);
+  //       console.log(`File: ${file.filename}`);
+  //       additions.forEach((addition, index) => {
+  //           console.log(`Addition ${index + 1}:`, addition);
+  //           message += addition + '\n';
+  //       });
+  //   }});
+
+  await ctx.broadcast([...feedMap[source]], message)
   })
 
   ctx.on('ready', async () => {
@@ -133,6 +185,7 @@ export function apply(ctx: Context, config: Config) {
         }
       }, (error) => {
         logger.debug(error)
+        console.error(error)
         return '无法订阅此链接。'
       })
     })
