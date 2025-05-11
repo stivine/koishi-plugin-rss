@@ -89,9 +89,7 @@ export function apply(ctx: Context, config: Config) {
     // 构建 API URL 和 headers
     const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${commitId}`;
     console.debug(apiUrl);
-    const headers = {
-  };
-
+    const headers = {};
     try {
         var response = await axios.get(apiUrl, { headers });
         // console.log(commitDetails); // 此处处理获取到的提交详情数据
