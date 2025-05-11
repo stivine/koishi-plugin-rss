@@ -90,7 +90,7 @@ export function apply(ctx: Context, config: Config) {
     const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${commitId}`;
     console.debug(apiUrl);
     const headers = {
-    'Authorization': 'token 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', // 替换成你的 GitHub token
+    'Authorization': 'token ?????', // 替换成你的 GitHub token
     'Accept': 'application/vnd.github.v3+json'
   };
 
